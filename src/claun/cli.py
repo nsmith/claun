@@ -1,6 +1,5 @@
 """CLI interface for claun using Typer."""
 
-import sys
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Optional
@@ -12,12 +11,12 @@ from claun.core.config import (
     ScheduleConfig,
     HourConfig,
     MinuteInterval,
-    AdvancedConfig,
     WEEKDAYS,
     WEEKENDS,
     ALL_DAYS,
 )
 
+# Main app - no subcommands for core functionality
 app = typer.Typer(
     name="claun",
     help="Schedule Claude Code jobs with a beautiful TUI or headless mode.",
@@ -107,8 +106,9 @@ def parse_single_hour(hour_str: str) -> Optional[int]:
         return None
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     # Core options
     command: Annotated[
         Optional[str],
@@ -171,7 +171,7 @@ def main(
     # Version
     version: Annotated[
         Optional[bool],
-        typer.Option("--version", "-v", callback=version_callback, is_eager=True),
+        typer.Option("--version", "-v", callback=version_callback, is_eager=True, help="Show version"),
     ] = None,
 ) -> None:
     """
@@ -187,6 +187,10 @@ def main(
 
         claun --weekdays --hours 9am-5pm   # Work hours only
     """
+    # If a subcommand is invoked, don't run main logic
+    if ctx.invoked_subcommand is not None:
+        return
+
     # Validate headless mode requires a command
     if headless and not command and not dry_run:
         typer.echo("Error: --headless mode requires --command", err=True)
