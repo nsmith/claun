@@ -134,15 +134,16 @@ class Executor:
 
     def _build_args(self, prompt: str) -> list[str]:
         """Build command line arguments for claude."""
-        # Start with claude and --print for non-interactive output
-        args = ["claude", "--print"]
+        args = ["claude"]
 
-        # Add any extra flags the user specified (before the prompt)
+        # Add any extra flags the user specified first
         if self.claude_flags:
             extra_flags = shlex.split(self.claude_flags)
             args.extend(extra_flags)
 
-        # Prompt is the last positional argument
+        # Always put --print and the prompt last (prevents variadic flags
+        # like --allowedTools from consuming the prompt)
+        args.append("--print")
         args.append(prompt)
 
         return args
