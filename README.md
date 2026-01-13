@@ -1,6 +1,6 @@
 # claun
 
-Schedule Claude Code jobs with a beautiful TUI or headless mode. Sometimes systemd is just overkill.
+Schedule Claude Code jobs with a TUI or headless mode. Sometimes systemd is just overkill. Pronounced "Klon" like the guitar pedal.
 
 ## Installation
 
@@ -15,10 +15,10 @@ pip install claun
 claun
 
 # Launch TUI with pre-filled command
-claun -c "Review the latest PR"
+claun -c "Review our metrics from the past hour for anomalies"
 
 # Run in headless mode
-claun -H -c "Run daily standup summary" -m 60
+claun -H -c "Update bug list from Linear MCP and fix" -m 60
 
 # See what would run without executing
 claun --dry-run -c "test command"
@@ -26,7 +26,7 @@ claun --dry-run -c "test command"
 
 ## Features
 
-- **Beautiful TUI**: Single-page interface with all controls visible
+- **Beautiful TUI**: Single-page interface with all controls visible - no menu diving
 - **Headless mode**: Run as a background service with terminal output
 - **Flexible scheduling**: Days of week, hour ranges, minute intervals
 - **Claude flags**: Pass any flags to claude (like `--resume` for session persistence)
@@ -82,13 +82,13 @@ You can also pass other claude flags:
 
 ```bash
 # Use a specific model
-claun -c "Review code" -f "--model opus"
+claun -c "Pull and fix bugs from the Linear MCP, run /code-simplifier and push PRs" -f "--model opus"
 
 # Enable web search
-claun -c "What are the latest Python 3.13 features?" -f "--allowedTools WebSearch"
+claun -c "What is the score of the Niners/Seahawks game?" -f "--allowedTools WebSearch"
 
 # Combine multiple flags
-claun -c "Fix bug" -f "--resume abc123 --model sonnet"
+claun -c "Fix the next bug on the bug list" -f "--resume abc123 --model sonnet"
 ```
 
 ## CLI Options
