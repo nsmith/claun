@@ -93,6 +93,38 @@ python -m build
 pip install -e .
 ```
 
+## Previewing the TUI (for Claude Code)
+
+Since Claude Code cannot run interactive TUIs directly, use the preview script to inspect the TUI state:
+
+```bash
+# Get text description of TUI state (quick check)
+python scripts/preview_tui.py --text
+
+# Generate SVG screenshot (visual inspection)
+python scripts/preview_tui.py
+
+# Preview with specific command pre-filled
+python scripts/preview_tui.py -c "My test command"
+
+# Save to specific file
+python scripts/preview_tui.py --svg my_screenshot.svg
+```
+
+The preview script outputs:
+- Current command input value
+- Session name value
+- Selected days (Mon-Sun)
+- Selected minute interval
+- Countdown timer value
+- Pause state and button label
+
+The SVG screenshot can be read directly to see the visual layout. Use this workflow when:
+- Testing TUI changes
+- Debugging widget behavior
+- Verifying layout and styling
+- Documenting the interface
+
 ## Session Handling
 
 When a session name is provided:
