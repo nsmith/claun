@@ -201,6 +201,7 @@ class ClaunApp(App):
         self._running = False
         self._first_run = True
         self._countdown_task: Optional[asyncio.Task] = None
+        self._schedule_changed = False  # Signal to recalculate next run
 
         if start_paused:
             self.scheduler.pause()
@@ -290,48 +291,67 @@ class ClaunApp(App):
 
     async def _scheduler_loop(self) -> None:
         """Main scheduler loop."""
-        while self._running:
-            next_run = self.scheduler.get_next_run()
+        self._log_message("[dim]Scheduler started[/dim]")
 
-            # Wait until next run
+        try:
             while self._running:
-                now = datetime.now()
-                if now >= next_run:
+                self._schedule_changed = False
+                next_run = self.scheduler.get_next_run()
+                self._log_message(f"[dim]Next run scheduled: {next_run.strftime('%H:%M:%S')}[/dim]")
+
+                # Wait until next run (or schedule changes)
+                while self._running and not self._schedule_changed:
+                    now = datetime.now()
+                    if now >= next_run:
+                        break
+                    await asyncio.sleep(0.5)
+
+                # If schedule changed, recalculate without firing
+                if self._schedule_changed:
+                    self._log_message("[dim]Schedule changed, recalculating...[/dim]")
+                    continue
+
+                if not self._running:
                     break
-                await asyncio.sleep(0.5)
 
-            if not self._running:
-                break
+                self._log_message("[cyan]Timer fired![/cyan]")
 
-            # Check if paused
-            if self.scheduler.is_paused:
-                self._log_message("[yellow]Skipped - Scheduler is paused[/yellow]")
-                self.log_manager.create_paused_entry(next_run)
-                continue
+                # Check if paused
+                if self.scheduler.is_paused:
+                    self._log_message("[yellow]Skipped - Scheduler is paused[/yellow]")
+                    self.log_manager.create_paused_entry(next_run)
+                    continue
 
-            # Get current command from input
-            command_input = self.query_one("#command-input", Input)
-            command = command_input.value.strip()
+                # Get current command from input
+                command_input = self.query_one("#command-input", Input)
+                command = command_input.value.strip()
 
-            if not command:
-                self._log_message("[red]No command configured[/red]")
-                continue
+                if not command:
+                    self._log_message("[red]No command configured - enter a command above[/red]")
+                    continue
 
-            # Execute
-            await self._execute_job(command)
+                # Execute
+                await self._execute_job(command)
+        except Exception as e:
+            self._log_message(f"[red bold]Scheduler loop error: {e}[/red bold]")
+            import traceback
+            self._log_message(f"[red]{traceback.format_exc()}[/red]")
 
     async def _execute_job(self, command: str) -> None:
         """Execute a scheduled job."""
         self._log_message(f"[cyan]Starting job: {command}[/cyan]")
 
-        log_file = self.log_manager.create_log()
-
-        session_input = self.query_one("#session-input", Input)
-        session_name = session_input.value.strip() or None
-
-        executor = Executor(session_name=session_name, passthrough=False)
-
         try:
+            log_file = self.log_manager.create_log()
+            self._log_message(f"[dim]Log file: {log_file}[/dim]")
+
+            session_input = self.query_one("#session-input", Input)
+            session_name = session_input.value.strip() or None
+            self._log_message(f"[dim]Session: {session_name or '(none)'}[/dim]")
+
+            executor = Executor(session_name=session_name, passthrough=False)
+            self._log_message(f"[dim]Running claude with first_run={self._first_run}[/dim]")
+
             result = await executor.run(
                 command,
                 first_run=self._first_run,
@@ -349,7 +369,9 @@ class ClaunApp(App):
             self._log_message(f"{status} ({result.duration_seconds:.1f}s) - Log: {log_file.name}")
 
         except Exception as e:
-            self._log_message(f"[red]Error: {e}[/red]")
+            import traceback
+            self._log_message(f"[red bold]Execution error: {e}[/red bold]")
+            self._log_message(f"[red]{traceback.format_exc()}[/red]")
 
     def _log_message(self, message: str) -> None:
         """Add a message to the log."""
@@ -398,6 +420,9 @@ class ClaunApp(App):
         self.config.minute_interval = interval
         self.scheduler = Scheduler(self.config)
         self.scheduler.get_next_run()
+
+        # Signal the scheduler loop to recalculate
+        self._schedule_changed = True
 
     def action_toggle_pause(self) -> None:
         """Toggle pause state."""
