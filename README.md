@@ -5,7 +5,7 @@ Schedule Claude Code jobs with a TUI or headless mode. Sometimes systemd is just
 ## Installation
 
 ```bash
-pip install claun
+pip install claun-tui
 ```
 
 ## Quick Start

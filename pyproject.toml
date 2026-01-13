@@ -1,5 +1,5 @@
 [project]
-name = "claun"
+name = "claun-tui"
 version = "0.1.0"
 description = "Schedule Claude Code jobs with a beautiful TUI or headless mode"
 readme = "README.md"
