@@ -114,9 +114,9 @@ def main(
         Optional[str],
         typer.Option("--command", "-c", help="Claude Code command to run"),
     ] = None,
-    session: Annotated[
+    flags: Annotated[
         Optional[str],
-        typer.Option("--session", "-s", help="Session name for persistence"),
+        typer.Option("--flags", "-f", help="Extra flags for claude (e.g., '--resume abc123')"),
     ] = None,
     # Mode selection
     headless: Annotated[
@@ -199,7 +199,7 @@ def main(
     # Build configuration
     config = ScheduleConfig(
         command=command or "",
-        session_name=session,
+        claude_flags=flags or "",
         days_of_week=parse_days(days, weekdays_only, weekends_only),
         hours=parse_hours(hours),
         minute_interval=MinuteInterval(int(minutes.value)),
@@ -233,7 +233,7 @@ def show_dry_run(config: ScheduleConfig) -> None:
 
     typer.echo("\n[Dry Run] Schedule Configuration:")
     typer.echo(f"  Command: {config.command or '(not set)'}")
-    typer.echo(f"  Session: {config.session_name or '(none)'}")
+    typer.echo(f"  Claude flags: {config.claude_flags or '(none)'}")
 
     # Days
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -268,11 +268,13 @@ def run_once_mode(config: ScheduleConfig) -> None:
     from claun.logging.manager import LogManager
 
     typer.echo(f"Running once: {config.command}")
+    if config.claude_flags:
+        typer.echo(f"Claude flags: {config.claude_flags}")
 
     log_manager = LogManager(Path(config.log_path), log_id=config.log_id)
     log_file = log_manager.create_log()
 
-    executor = Executor(session_name=config.session_name, passthrough=True)
+    executor = Executor(claude_flags=config.claude_flags, passthrough=True)
 
     def on_output(line: str) -> None:
         typer.echo(line)
@@ -280,7 +282,6 @@ def run_once_mode(config: ScheduleConfig) -> None:
     async def run() -> int:
         result = await executor.run(
             config.command,
-            first_run=True,
             log_file=log_file,
             on_output=on_output,
         )

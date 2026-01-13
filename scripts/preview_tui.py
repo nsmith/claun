@@ -42,10 +42,10 @@ async def preview_tui(
         command_input = app.query_one("#command-input")
         print(f"\nCommand Input: {command_input.value!r}")
 
-        # Session input
-        session_input = app.query_one("#session-input")
-        session_val = session_input.value or "(empty)"
-        print(f"Session Name: {session_val!r}")
+        # Claude flags input
+        flags_input = app.query_one("#flags-input")
+        flags_val = flags_input.value or "(empty)"
+        print(f"Claude Flags: {flags_val!r}")
 
         # Day buttons
         days = []

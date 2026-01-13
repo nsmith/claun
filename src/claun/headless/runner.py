@@ -3,7 +3,6 @@
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from claun.core.config import ScheduleConfig
 from claun.core.executor import Executor
@@ -27,16 +26,11 @@ class HeadlessRunner:
         """
         self.config = config
         self.scheduler = Scheduler(config)
-        self.executor = Executor(
-            session_name=config.session_name,
-            passthrough=True,
-        )
         self.log_manager = LogManager(
             Path(config.log_path),
             log_id=config.log_id,
         )
         self._running = False
-        self._first_run = True
 
         if start_paused:
             self.scheduler.pause()
@@ -89,19 +83,17 @@ class HeadlessRunner:
         self._print_job_start()
 
         log_file = self.log_manager.create_log()
+        executor = Executor(claude_flags=self.config.claude_flags, passthrough=True)
 
         def on_output(line: str) -> None:
             print(line)
 
         try:
-            result = await self.executor.run(
+            result = await executor.run(
                 self.config.command,
-                first_run=self._first_run,
-                resume=not self._first_run and self.config.session_name is not None,
                 log_file=log_file,
                 on_output=on_output,
             )
-            self._first_run = False
             self._print_job_end(result.exit_code, result.duration_seconds, log_file)
 
         except Exception as e:
@@ -113,8 +105,8 @@ class HeadlessRunner:
         print("Claun - Claude Code Job Scheduler (Headless Mode)")
         print("=" * 60)
         print(f"Command: {self.config.command}")
-        if self.config.session_name:
-            print(f"Session: {self.config.session_name}")
+        if self.config.claude_flags:
+            print(f"Claude flags: {self.config.claude_flags}")
         print(f"Interval: Every {self.config.minute_interval.value} minutes")
         print(f"Log path: {self.config.log_path}")
         if self.scheduler.is_paused:

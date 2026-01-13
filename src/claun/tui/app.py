@@ -80,12 +80,12 @@ class ClaunApp(App):
         width: 100%;
     }
 
-    #session-section {
+    #flags-section {
         height: auto;
         margin-bottom: 1;
     }
 
-    #session-input {
+    #flags-input {
         width: 100%;
     }
 
@@ -190,16 +190,11 @@ class ClaunApp(App):
         super().__init__()
         self.config = config or ScheduleConfig(command="")
         self.scheduler = Scheduler(self.config)
-        self.executor = Executor(
-            session_name=self.config.session_name,
-            passthrough=False,
-        )
         self.log_manager = LogManager(
             Path(self.config.log_path),
             log_id=self.config.log_id,
         )
         self._running = False
-        self._first_run = True
         self._countdown_task: Optional[asyncio.Task] = None
         self._schedule_changed = False  # Signal to recalculate next run
 
@@ -220,13 +215,13 @@ class ClaunApp(App):
                     id="command-input",
                 )
 
-            # Session input
-            with Vertical(id="session-section"):
-                yield Label("Session Name (optional):", classes="section-label")
+            # Claude flags input
+            with Vertical(id="flags-section"):
+                yield Label("Claude Flags (optional):", classes="section-label")
                 yield Input(
-                    placeholder="Leave empty for no session persistence",
-                    value=self.config.session_name or "",
-                    id="session-input",
+                    placeholder="e.g., --resume abc123 or --model sonnet",
+                    value=self.config.claude_flags,
+                    id="flags-input",
                 )
 
             # Timer controls
@@ -345,20 +340,17 @@ class ClaunApp(App):
             log_file = self.log_manager.create_log()
             self._log_message(f"[dim]Log file: {log_file}[/dim]")
 
-            session_input = self.query_one("#session-input", Input)
-            session_name = session_input.value.strip() or None
-            self._log_message(f"[dim]Session: {session_name or '(none)'}[/dim]")
+            flags_input = self.query_one("#flags-input", Input)
+            claude_flags = flags_input.value.strip()
+            if claude_flags:
+                self._log_message(f"[dim]Flags: {claude_flags}[/dim]")
 
-            executor = Executor(session_name=session_name, passthrough=False)
-            self._log_message(f"[dim]Running claude with first_run={self._first_run}[/dim]")
+            executor = Executor(claude_flags=claude_flags, passthrough=False)
 
             result = await executor.run(
                 command,
-                first_run=self._first_run,
-                resume=not self._first_run and session_name is not None,
                 log_file=log_file,
             )
-            self._first_run = False
 
             # Log output
             for line in result.output.split("\n"):

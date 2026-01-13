@@ -31,8 +31,6 @@ src/claun/
 ├── core/                 # Business logic (presentation-agnostic)
 │   ├── scheduler.py      # Schedule calculation engine
 │   ├── executor.py       # Claude Code process management
-│   ├── session.py        # Session persistence (/rename, /resume)
-│   ├── timer.py          # Countdown timer logic
 │   └── config.py         # Configuration dataclasses
 ├── scheduling/           # Scheduling abstractions
 │   ├── models.py         # Schedule, TimeSpec dataclasses
@@ -113,7 +111,7 @@ python scripts/preview_tui.py --svg my_screenshot.svg
 
 The preview script outputs:
 - Current command input value
-- Session name value
+- Claude flags value
 - Selected days (Mon-Sun)
 - Selected minute interval
 - Countdown timer value
@@ -125,11 +123,15 @@ The SVG screenshot can be read directly to see the visual layout. Use this workf
 - Verifying layout and styling
 - Documenting the interface
 
-## Session Handling
+## Claude Flags
 
-When a session name is provided:
-1. First run: Use `/rename <session-name>` to name the session
-2. Subsequent runs: Use `/resume <session-name>` to continue
+Users can pass any flags to claude via the `--flags` CLI option or the "Claude Flags" TUI field.
+
+Common use cases:
+- `--resume <session-id>` - Resume a previous session
+- `--model opus` - Use a specific model
+- `--allowedTools WebSearch` - Enable web search
+- Multiple flags can be combined: `--resume abc123 --model sonnet`
 
 ## Log File Naming
 

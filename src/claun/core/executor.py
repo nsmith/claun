@@ -1,7 +1,8 @@
 """Claude Code process management."""
 
 import asyncio
-from dataclasses import dataclass, field
+import shlex
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -18,7 +19,6 @@ class ExecutionResult:
 
     output: str
     exit_code: int
-    session_id: Optional[str] = None
     duration_seconds: float = 0.0
     error_output: str = ""
 
@@ -28,33 +28,28 @@ class Executor:
 
     def __init__(
         self,
-        session_name: Optional[str] = None,
+        claude_flags: str = "",
         passthrough: bool = False,
     ) -> None:
         """Initialize executor.
 
         Args:
-            session_name: Optional session name for persistence.
+            claude_flags: Extra flags to pass to claude (e.g., "--resume abc123").
             passthrough: If True, stream output directly instead of capturing.
         """
-        self.session_name = session_name
+        self.claude_flags = claude_flags
         self.passthrough = passthrough
-        self._session_id: Optional[str] = None
 
     async def run(
         self,
-        command: str,
-        first_run: bool = False,
-        resume: bool = False,
+        prompt: str,
         log_file: Optional[Path] = None,
         on_output: Optional[Callable[[str], None]] = None,
     ) -> ExecutionResult:
-        """Execute a command in Claude Code.
+        """Execute a prompt in Claude Code.
 
         Args:
-            command: The command/prompt to send to Claude Code.
-            first_run: If True, use --print-session-id for session management.
-            resume: If True, resume the previous session.
+            prompt: The prompt to send to Claude Code.
             log_file: Optional path to write output to.
             on_output: Optional callback for each line of output (for passthrough).
 
@@ -66,7 +61,7 @@ class Executor:
         start_time = time.time()
 
         # Build command arguments
-        args = self._build_args(command, first_run, resume)
+        args = self._build_args(prompt)
 
         try:
             process = await asyncio.create_subprocess_exec(
@@ -130,44 +125,24 @@ class Executor:
         output = "".join(output_lines)
         error_output = "".join(error_lines)
 
-        # Extract session ID if this was a first run
-        session_id = None
-        if first_run and self.session_name:
-            session_id = self._extract_session_id(output)
-            if session_id:
-                self._session_id = session_id
-
         return ExecutionResult(
             output=output,
             exit_code=process.returncode or 0,
-            session_id=session_id,
             duration_seconds=duration,
             error_output=error_output,
         )
 
-    def _build_args(
-        self, command: str, first_run: bool, resume: bool
-    ) -> list[str]:
+    def _build_args(self, prompt: str) -> list[str]:
         """Build command line arguments for claude."""
-        args = ["claude", "--print", command]
+        # Start with claude and --print for non-interactive output
+        args = ["claude", "--print"]
 
-        if self.session_name:
-            if first_run:
-                # First run: get session ID for later resume
-                args.append("--print-session-id")
-            elif resume and self._session_id:
-                # Resume: use saved session ID
-                args.extend(["--session", self._session_id])
+        # Add any extra flags the user specified (before the prompt)
+        if self.claude_flags:
+            extra_flags = shlex.split(self.claude_flags)
+            args.extend(extra_flags)
+
+        # Prompt is the last positional argument
+        args.append(prompt)
 
         return args
-
-    def _extract_session_id(self, output: str) -> Optional[str]:
-        """Extract session ID from claude output."""
-        # Session ID is typically printed as a UUID or similar identifier
-        # Look for lines that look like session IDs
-        for line in output.split("\n"):
-            line = line.strip()
-            # Session IDs are typically UUIDs or alphanumeric strings
-            if len(line) > 10 and len(line) < 100 and line.replace("-", "").isalnum():
-                return line
-        return None

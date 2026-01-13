@@ -29,7 +29,7 @@ claun --dry-run -c "test command"
 - **Beautiful TUI**: Single-page interface with all controls visible
 - **Headless mode**: Run as a background service with terminal output
 - **Flexible scheduling**: Days of week, hour ranges, minute intervals
-- **Session persistence**: Optionally resume Claude Code sessions
+- **Claude flags**: Pass any flags to claude (like `--resume` for session persistence)
 - **Simple logging**: Automatic log files with browseable history
 
 ## TUI Mode
@@ -37,7 +37,7 @@ claun --dry-run -c "test command"
 Launch with `claun` to get an interactive interface with:
 
 - Command input field
-- Optional session name for persistence
+- Optional Claude flags (e.g., `--resume <session-id>` or `--model sonnet`)
 - Day-of-week toggles (M T W T F S S)
 - Minute interval selector (1, 5, 15, or 60 minutes)
 - Big countdown clock to next run
@@ -65,12 +65,38 @@ claun -H -c "Status update" --hours "9am-5pm" -m 60
 claun -H -c "Daily standup" --weekdays -m 60
 ```
 
+## Session Persistence
+
+To resume a previous Claude Code session, use the `--flags` option to pass `--resume`:
+
+```bash
+# First, note your session ID from a previous run
+# Then resume it:
+claun -c "Continue working on the feature" -f "--resume abc123-def456"
+
+# In the TUI, enter in the "Claude Flags" field:
+# --resume abc123-def456
+```
+
+You can also pass other claude flags:
+
+```bash
+# Use a specific model
+claun -c "Review code" -f "--model opus"
+
+# Enable web search
+claun -c "What are the latest Python 3.13 features?" -f "--allowedTools WebSearch"
+
+# Combine multiple flags
+claun -c "Fix bug" -f "--resume abc123 --model sonnet"
+```
+
 ## CLI Options
 
 ```
 Options:
   -c, --command TEXT      Claude Code command to run
-  -s, --session TEXT      Session name for persistence
+  -f, --flags TEXT        Extra flags for claude (e.g., '--resume abc123')
   -H, --headless          Run in headless mode (no TUI)
   -d, --days TEXT         Days to run (mon,tue,wed,thu,fri,sat,sun)
   --weekdays              Run only on weekdays (mon-fri)

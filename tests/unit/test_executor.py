@@ -1,7 +1,7 @@
 """Tests for the executor module."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from pathlib import Path
 
 from claun.core.executor import Executor, ExecutionResult, ExecutionError
@@ -15,10 +15,10 @@ class TestExecutorBasics:
         executor = Executor()
         assert executor is not None
 
-    def test_executor_with_session(self) -> None:
-        """Executor can be created with session name."""
-        executor = Executor(session_name="my-session")
-        assert executor.session_name == "my-session"
+    def test_executor_with_flags(self) -> None:
+        """Executor can be created with claude flags."""
+        executor = Executor(claude_flags="--resume abc123")
+        assert executor.claude_flags == "--resume abc123"
 
 
 class TestCommandExecution:
@@ -26,7 +26,7 @@ class TestCommandExecution:
 
     @pytest.mark.asyncio
     async def test_runs_claude_command(self) -> None:
-        """Executor runs claude with the command."""
+        """Executor runs claude with the prompt."""
         executor = Executor()
 
         with patch("asyncio.create_subprocess_exec") as mock_exec:
@@ -88,13 +88,13 @@ class TestCommandExecution:
             assert result.exit_code == 1
 
 
-class TestSessionHandling:
-    """Test session persistence."""
+class TestClaudeFlagsHandling:
+    """Test claude flags handling."""
 
     @pytest.mark.asyncio
-    async def test_first_run_uses_print_session_id(self) -> None:
-        """First run uses --print-session-id to get session ID."""
-        executor = Executor(session_name="my-session")
+    async def test_passes_extra_flags_to_claude(self) -> None:
+        """Extra flags are passed to claude command."""
+        executor = Executor(claude_flags="--resume abc123 --model opus")
 
         with patch("asyncio.create_subprocess_exec") as mock_exec:
             mock_process = AsyncMock()
@@ -106,17 +106,19 @@ class TestSessionHandling:
             mock_process.wait = AsyncMock(return_value=0)
             mock_exec.return_value = mock_process
 
-            await executor.run("test", first_run=True)
+            await executor.run("test prompt")
 
             call_args = mock_exec.call_args
-            args_str = " ".join(call_args[0])
-            assert "--print-session-id" in args_str
+            args = list(call_args[0])
+            assert "--resume" in args
+            assert "abc123" in args
+            assert "--model" in args
+            assert "opus" in args
 
     @pytest.mark.asyncio
-    async def test_resume_uses_session_flag(self) -> None:
-        """Resume uses --session flag with session ID."""
-        executor = Executor(session_name="my-session")
-        executor._session_id = "abc123"  # Simulate previous run
+    async def test_uses_print_flag(self) -> None:
+        """Executor uses --print flag for non-interactive output."""
+        executor = Executor()
 
         with patch("asyncio.create_subprocess_exec") as mock_exec:
             mock_process = AsyncMock()
@@ -128,11 +130,12 @@ class TestSessionHandling:
             mock_process.wait = AsyncMock(return_value=0)
             mock_exec.return_value = mock_process
 
-            await executor.run("test", resume=True)
+            await executor.run("my prompt")
 
             call_args = mock_exec.call_args
-            args_str = " ".join(call_args[0])
-            assert "--session" in args_str or "-s" in args_str
+            args = list(call_args[0])
+            assert "--print" in args
+            assert "my prompt" in args
 
 
 class TestPassthroughMode:

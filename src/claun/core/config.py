@@ -75,11 +75,11 @@ class AdvancedConfig:
 class ScheduleConfig:
     """Complete schedule configuration."""
 
-    # Required: the command to run
+    # Required: the prompt to run
     command: str
 
-    # Optional session name for persistence
-    session_name: Optional[str] = None
+    # Optional extra flags for claude (e.g., "--resume abc123")
+    claude_flags: str = ""
 
     # Days of week to run (0=Monday, 6=Sunday)
     days_of_week: set[int] = field(default_factory=lambda: set(ALL_DAYS))
