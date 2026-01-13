@@ -98,8 +98,7 @@ class ScheduleConfig:
     log_id: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if not self.command:
-            raise ValueError("command cannot be empty")
+        # Command can be empty for TUI mode where user enters it interactively
         for day in self.days_of_week:
             if not 0 <= day <= 6:
                 raise ValueError(f"day_of_week must be 0-6, got {day}")
