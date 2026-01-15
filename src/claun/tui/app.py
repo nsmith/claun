@@ -24,6 +24,7 @@ from claun.core.config import ScheduleConfig, MinuteInterval, HourConfig, ALL_DA
 from claun.core.executor import Executor
 from claun.core.scheduler import Scheduler
 from claun.logging.manager import LogManager
+from claun.tui.screens.save_config import SaveConfigModal
 
 
 class DayButton(Button):
@@ -343,6 +344,7 @@ class ClaunApp(App):
         Binding("p", "toggle_pause", "Pause/Resume"),
         Binding("r", "run_now", "Run Now"),
         Binding("c", "clear_log", "Clear Log"),
+        Binding("s", "save_config", "Save Config"),
     ]
 
     def __init__(
@@ -704,6 +706,21 @@ class ClaunApp(App):
         """Clear the output log."""
         log = self.query_one("#output-log", RichLog)
         log.clear()
+
+    def action_save_config(self) -> None:
+        """Open the save config modal."""
+        # Sync current UI state to config
+        self._update_schedule()
+        command_input = self.query_one("#command-input", Input)
+        flags_input = self.query_one("#flags-input", Input)
+        self.config.command = command_input.value
+        self.config.claude_flags = flags_input.value
+
+        def on_save_result(path: str | None) -> None:
+            if path:
+                self._log_message(f"[green]Config saved to {path}[/green]")
+
+        self.push_screen(SaveConfigModal(self.config), callback=on_save_result)
 
     def action_quit(self) -> None:
         """Quit the application."""

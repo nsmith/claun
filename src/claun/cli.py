@@ -109,6 +109,11 @@ def parse_single_hour(hour_str: str) -> Optional[int]:
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
+    # Config file
+    config_file: Annotated[
+        Optional[Path],
+        typer.Option("--config", "-C", help="Load config from JSON file"),
+    ] = None,
     # Core options
     command: Annotated[
         Optional[str],
@@ -191,21 +196,47 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
+    # Auto-detect .claun.json if --config not specified
+    config_path = config_file
+    if config_path is None:
+        default_config = Path(".claun.json")
+        if default_config.exists():
+            config_path = default_config
+
+    # Load base config from file or defaults
+    if config_path:
+        if not config_path.exists():
+            typer.echo(f"Error: Config file not found: {config_path}", err=True)
+            raise typer.Exit(1)
+        try:
+            config = ScheduleConfig.load_from_file(config_path)
+            typer.echo(f"Loaded config from {config_path}")
+        except Exception as e:
+            typer.echo(f"Error loading config: {e}", err=True)
+            raise typer.Exit(1)
+    else:
+        config = ScheduleConfig(command="")
+
+    # Override with CLI args that were explicitly set
+    if command is not None:
+        config.command = command
+    if flags is not None:
+        config.claude_flags = flags
+    if days is not None or weekdays_only or weekends_only:
+        config.days_of_week = parse_days(days, weekdays_only, weekends_only)
+    if hours is not None:
+        config.hours = parse_hours(hours)
+    if minutes != MinuteOption.fifteen:  # Only override if not default
+        config.minute_interval = MinuteInterval(int(minutes.value))
+    if log_path is not None:
+        config.log_path = str(log_path)
+    if log_id is not None:
+        config.log_id = log_id
+
     # Validate headless mode requires a command
-    if headless and not command and not dry_run:
+    if headless and not config.command and not dry_run:
         typer.echo("Error: --headless mode requires --command", err=True)
         raise typer.Exit(1)
-
-    # Build configuration
-    config = ScheduleConfig(
-        command=command or "",
-        claude_flags=flags or "",
-        days_of_week=parse_days(days, weekdays_only, weekends_only),
-        hours=parse_hours(hours),
-        minute_interval=MinuteInterval(int(minutes.value)),
-        log_path=str(log_path) if log_path else ".",
-        log_id=log_id,
-    )
 
     # Handle dry run
     if dry_run:
