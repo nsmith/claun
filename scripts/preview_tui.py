@@ -71,8 +71,8 @@ async def preview_tui(
                 break
 
         # Countdown
-        countdown = app.query_one("#countdown-digits")
-        print(f"Countdown: {countdown.value}")
+        countdown = app.query_one("#countdown-display")
+        print(f"Countdown: {countdown._time}")
 
         # Pause state
         pause_btn = app.query_one("#pause-button")
