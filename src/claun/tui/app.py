@@ -16,11 +16,12 @@ from textual.widgets import (
     Input,
     Label,
     RichLog,
+    Select,
     Static,
     Switch,
 )
 
-from claun.core.config import ScheduleConfig, MinuteInterval, ALL_DAYS
+from claun.core.config import ScheduleConfig, MinuteInterval, HourConfig, ALL_DAYS
 from claun.core.executor import Executor
 from claun.core.scheduler import Scheduler
 from claun.logging.manager import LogManager
@@ -56,6 +57,25 @@ class MinuteButton(Button):
 
         if self.selected:
             self.add_class("selected")
+
+
+class HourButton(Button):
+    """A button for hour selection."""
+
+    def __init__(self, hour: int, is_start: bool = True, **kwargs) -> None:
+        label = f"{hour:02d}:00"
+        prefix = "start" if is_start else "end"
+        super().__init__(label, id=f"{prefix}-hour-{hour}", **kwargs)
+        self.hour = hour
+        self.is_start = is_start
+        self.selected = False
+
+    def set_selected(self, selected: bool) -> None:
+        self.selected = selected
+        if selected:
+            self.add_class("selected")
+        else:
+            self.remove_class("selected")
 
 
 class ClaunApp(App):
@@ -114,6 +134,18 @@ class ClaunApp(App):
     #hour-section {
         height: auto;
         margin-bottom: 1;
+    }
+
+    .hour-select {
+        width: 12;
+    }
+
+    #all-hours-label {
+        margin-right: 1;
+    }
+
+    #all-hours-label.dimmed {
+        color: $text-disabled;
     }
 
     #minute-section {
@@ -236,6 +268,38 @@ class ClaunApp(App):
                             btn.selected = False
                             btn.remove_class("selected")
                         yield btn
+
+                # Hour range selector
+                # Switch LEFT (off) = All Day, Switch RIGHT (on) = Hour Range
+                with Horizontal(id="hour-section"):
+                    yield Label("Hours: ", classes="section-label")
+                    all_day_label = Label("All day ", id="all-hours-label")
+                    use_hour_range = not self.config.hours.run_every_hour
+                    if use_hour_range:
+                        all_day_label.add_class("dimmed")
+                    yield all_day_label
+                    yield Switch(
+                        value=use_hour_range,
+                        id="hour-range-switch",
+                    )
+
+                    # Hour range selectors (enabled when switch is RIGHT/on)
+                    hour_options = [(f"{h:02d}:00", h) for h in range(24)]
+                    yield Select(
+                        hour_options,
+                        value=self.config.hours.start_hour,
+                        id="start-hour-select",
+                        classes="hour-select",
+                        disabled=not use_hour_range,
+                    )
+                    yield Label(" to ", id="hour-to-label")
+                    yield Select(
+                        hour_options,
+                        value=self.config.hours.end_hour,
+                        id="end-hour-select",
+                        classes="hour-select",
+                        disabled=not use_hour_range,
+                    )
 
                 # Minute interval selector
                 with Horizontal(id="minute-section"):
@@ -392,6 +456,34 @@ class ClaunApp(App):
         elif button.id == "pause-button":
             self.action_toggle_pause()
 
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        """Handle switch changes."""
+        if event.switch.id == "hour-range-switch":
+            # Switch RIGHT (on/true) = use hour range
+            # Switch LEFT (off/false) = all day
+            use_hour_range = event.value
+
+            start_select = self.query_one("#start-hour-select", Select)
+            end_select = self.query_one("#end-hour-select", Select)
+            all_day_label = self.query_one("#all-hours-label", Label)
+
+            # Enable hour selects when using hour range
+            start_select.disabled = not use_hour_range
+            end_select.disabled = not use_hour_range
+
+            # Dim the "All day" label when using hour range
+            if use_hour_range:
+                all_day_label.add_class("dimmed")
+            else:
+                all_day_label.remove_class("dimmed")
+
+            self._update_schedule()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        """Handle select changes."""
+        if event.select.id in ("start-hour-select", "end-hour-select"):
+            self._update_schedule()
+
     def _update_schedule(self) -> None:
         """Update schedule from UI state."""
         # Get selected days
@@ -399,6 +491,22 @@ class ClaunApp(App):
         for btn in self.query(".day-button"):
             if isinstance(btn, DayButton) and btn.selected:
                 days.add(btn.day_num)
+
+        # Get hour configuration
+        # Switch RIGHT (on) = use hour range, Switch LEFT (off) = all day
+        hour_range_switch = self.query_one("#hour-range-switch", Switch)
+        start_select = self.query_one("#start-hour-select", Select)
+        end_select = self.query_one("#end-hour-select", Select)
+
+        # Handle Select.BLANK value
+        start_hour = start_select.value if start_select.value != Select.BLANK else 0
+        end_hour = end_select.value if end_select.value != Select.BLANK else 23
+
+        hours = HourConfig(
+            run_every_hour=not hour_range_switch.value,  # Inverted: switch ON = use range
+            start_hour=start_hour,
+            end_hour=end_hour,
+        )
 
         # Get selected minute interval
         interval = MinuteInterval.EVERY_15
@@ -409,6 +517,7 @@ class ClaunApp(App):
 
         # Update config and scheduler
         self.config.days_of_week = days
+        self.config.hours = hours
         self.config.minute_interval = interval
         self.scheduler = Scheduler(self.config)
         self.scheduler.get_next_run()

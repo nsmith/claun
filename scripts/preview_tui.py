@@ -55,6 +55,15 @@ async def preview_tui(
                 days.append(day_names[i])
         print(f"Selected Days: {', '.join(days)}")
 
+        # Hour settings (switch OFF = all day, switch ON = hour range)
+        hour_range_switch = app.query_one("#hour-range-switch")
+        if hour_range_switch.value:
+            start_select = app.query_one("#start-hour-select")
+            end_select = app.query_one("#end-hour-select")
+            print(f"Hours: {start_select.value:02d}:00 - {end_select.value:02d}:00")
+        else:
+            print("Hours: All day")
+
         # Minute interval
         for btn in app.query(".minute-button"):
             if hasattr(btn, "selected") and btn.selected:
