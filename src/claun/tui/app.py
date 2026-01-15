@@ -100,6 +100,13 @@ class RetroCountdown(Static):
     def __init__(self, **kwargs) -> None:
         super().__init__("", **kwargs)
         self._time = "00:00:00"
+        self._compact = False
+
+    def set_compact(self, compact: bool) -> None:
+        """Switch between ASCII art and compact text mode."""
+        if self._compact != compact:
+            self._compact = compact
+            self._render_time()
 
     def set_time(self, time_str: str) -> None:
         """Update the displayed time."""
@@ -107,7 +114,13 @@ class RetroCountdown(Static):
         self._render_time()
 
     def _render_time(self) -> None:
-        """Render the time as Mets orange ASCII art."""
+        """Render the time as Mets orange ASCII art or compact text."""
+        if self._compact:
+            # Compact mode: simple large text
+            self.update(f"[bold {self.METS_ORANGE}]{self._time}[/]")
+            return
+
+        # Full ASCII art mode
         lines = ["", "", "", "", ""]
 
         for char in self._time:
@@ -172,6 +185,7 @@ class ClaunApp(App):
     #schedule-row {
         height: auto;
         margin-bottom: 1;
+        layout: horizontal;
     }
 
     #timer-section {
@@ -254,6 +268,11 @@ class ClaunApp(App):
         padding: 1 2;
         border: heavy #FF5910;
         background: #0d0d18;
+    }
+
+    #countdown-section.compact {
+        width: auto;
+        min-width: 12;
     }
 
     #countdown-display {
@@ -448,7 +467,24 @@ class ClaunApp(App):
         """Called when app is mounted."""
         self._start_countdown()
         self._running = True
+        self._update_layout_for_width()
         self.run_worker(self._scheduler_loop())
+
+    def on_resize(self) -> None:
+        """Handle terminal resize."""
+        self._update_layout_for_width()
+
+    def _update_layout_for_width(self) -> None:
+        """Update layout based on terminal width."""
+        countdown = self.query_one("#countdown-display", RetroCountdown)
+        countdown_section = self.query_one("#countdown-section")
+        # Switch to compact text mode when narrow instead of stacking
+        if self.size.width < 100:
+            countdown.set_compact(True)
+            countdown_section.add_class("compact")
+        else:
+            countdown.set_compact(False)
+            countdown_section.remove_class("compact")
 
     def _start_countdown(self) -> None:
         """Start the countdown timer."""
