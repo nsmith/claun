@@ -10,17 +10,17 @@ from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import (
     Button,
-    Digits,
     Footer,
     Header,
     Input,
     Label,
     RichLog,
+    Select,
     Static,
     Switch,
 )
 
-from claun.core.config import ScheduleConfig, MinuteInterval, ALL_DAYS
+from claun.core.config import ScheduleConfig, MinuteInterval, HourConfig, ALL_DAYS
 from claun.core.executor import Executor
 from claun.core.scheduler import Scheduler
 from claun.logging.manager import LogManager
@@ -58,12 +58,82 @@ class MinuteButton(Button):
             self.add_class("selected")
 
 
+class HourButton(Button):
+    """A button for hour selection."""
+
+    def __init__(self, hour: int, is_start: bool = True, **kwargs) -> None:
+        label = f"{hour:02d}:00"
+        prefix = "start" if is_start else "end"
+        super().__init__(label, id=f"{prefix}-hour-{hour}", **kwargs)
+        self.hour = hour
+        self.is_start = is_start
+        self.selected = False
+
+    def set_selected(self, selected: bool) -> None:
+        self.selected = selected
+        if selected:
+            self.add_class("selected")
+        else:
+            self.remove_class("selected")
+
+
+class RetroCountdown(Static):
+    """A retro ASCII art countdown display with Mets colors."""
+
+    # Extra chunky ASCII art digits (5 lines tall, wider)
+    DIGITS = {
+        "0": ["██████", "██  ██", "██  ██", "██  ██", "██████"],
+        "1": ["  ██  ", " ███  ", "  ██  ", "  ██  ", "██████"],
+        "2": ["██████", "    ██", "██████", "██    ", "██████"],
+        "3": ["██████", "    ██", "██████", "    ██", "██████"],
+        "4": ["██  ██", "██  ██", "██████", "    ██", "    ██"],
+        "5": ["██████", "██    ", "██████", "    ██", "██████"],
+        "6": ["██████", "██    ", "██████", "██  ██", "██████"],
+        "7": ["██████", "    ██", "   ██ ", "  ██  ", "  ██  "],
+        "8": ["██████", "██  ██", "██████", "██  ██", "██████"],
+        "9": ["██████", "██  ██", "██████", "    ██", "██████"],
+        ":": ["  ", "██", "  ", "██", "  "],
+    }
+
+    METS_ORANGE = "#FF5910"
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__("", **kwargs)
+        self._time = "00:00:00"
+
+    def set_time(self, time_str: str) -> None:
+        """Update the displayed time."""
+        self._time = time_str
+        self._render_time()
+
+    def _render_time(self) -> None:
+        """Render the time as Mets orange ASCII art."""
+        lines = ["", "", "", "", ""]
+
+        for char in self._time:
+            digit_art = self.DIGITS.get(char, ["  ", "  ", "  ", "  ", "  "])
+
+            for line_idx in range(5):
+                lines[line_idx] += f"[bold {self.METS_ORANGE}]{digit_art[line_idx]}[/] "
+
+        self.update("\n".join(lines))
+
+
 class ClaunApp(App):
     """Main claun TUI application."""
+
+    TITLE = "CLAUN"
+
+    # Mets colors
+    METS_BLUE = "#002D72"
+    METS_ORANGE = "#FF5910"
+    METS_LIGHT_BLUE = "#003087"
+    METS_DARK_ORANGE = "#D94E1F"
 
     CSS = """
     Screen {
         layout: vertical;
+        background: #0a0a12;
     }
 
     #main-container {
@@ -78,6 +148,11 @@ class ClaunApp(App):
 
     #command-input {
         width: 100%;
+        border: solid #002D72;
+    }
+
+    #command-input:focus {
+        border: solid #FF5910;
     }
 
     #flags-section {
@@ -87,13 +162,25 @@ class ClaunApp(App):
 
     #flags-input {
         width: 100%;
+        border: solid #002D72;
+    }
+
+    #flags-input:focus {
+        border: solid #FF5910;
+    }
+
+    #schedule-row {
+        height: auto;
+        margin-bottom: 1;
     }
 
     #timer-section {
+        width: 3fr;
+        min-width: 45;
         height: auto;
-        margin-bottom: 1;
         padding: 1;
-        border: solid $primary;
+        border: solid #002D72;
+        background: #0d0d18;
     }
 
     #day-selector {
@@ -105,15 +192,36 @@ class ClaunApp(App):
         width: 5;
         min-width: 5;
         margin-right: 1;
+        background: #002D72;
+        color: white;
+    }
+
+    .day-button:hover {
+        background: #003087;
     }
 
     .day-button.selected {
-        background: $success;
+        background: #FF5910;
+        color: white;
     }
 
     #hour-section {
         height: auto;
         margin-bottom: 1;
+    }
+
+    .hour-select {
+        width: 18;
+        border: solid #002D72;
+    }
+
+    #all-hours-label {
+        margin-right: 1;
+        color: #FF5910;
+    }
+
+    #all-hours-label.dimmed {
+        color: #666666;
     }
 
     #minute-section {
@@ -124,54 +232,90 @@ class ClaunApp(App):
         width: 6;
         min-width: 6;
         margin-right: 1;
+        background: #002D72;
+        color: white;
+    }
+
+    .minute-button:hover {
+        background: #003087;
     }
 
     .minute-button.selected {
-        background: $success;
+        background: #FF5910;
+        color: white;
     }
 
     #countdown-section {
-        height: 12;
+        width: 2fr;
+        min-width: 28;
+        height: auto;
         align: center middle;
-        margin: 1;
-        padding: 1;
-        border: heavy $primary;
-        background: $surface;
+        margin-left: 1;
+        padding: 1 2;
+        border: heavy #FF5910;
+        background: #0d0d18;
     }
 
-    #countdown-digits {
-        width: auto;
-        text-style: bold;
+    #countdown-display {
+        width: 100%;
+        height: auto;
+        content-align: center middle;
+        text-align: center;
     }
 
     #pause-button {
         margin-top: 1;
         width: 20;
+        background: #002D72;
+        color: white;
+    }
+
+    #pause-button:hover {
+        background: #003087;
     }
 
     #pause-button.paused {
-        background: $warning;
+        background: #FF5910;
+        color: white;
     }
 
     #output-section {
         height: 1fr;
-        border: solid $primary;
+        border: solid #002D72;
+        background: #0d0d18;
     }
 
     #log-path-label {
         height: 1;
         padding: 0 1;
-        background: $surface;
+        background: #002D72;
+        color: #FF5910;
     }
 
     #output-log {
         height: 1fr;
+        color: #BF40FF;
     }
 
     .section-label {
         height: 1;
         margin-bottom: 0;
-        color: $text-muted;
+        color: #FF5910;
+    }
+
+    Header {
+        background: #002D72;
+        color: #FF5910;
+    }
+
+    Footer {
+        background: #002D72;
+        color: white;
+    }
+
+    Footer > .footer--key {
+        background: #FF5910;
+        color: white;
     }
     """
 
@@ -224,40 +368,74 @@ class ClaunApp(App):
                     id="flags-input",
                 )
 
-            # Timer controls
-            with Vertical(id="timer-section"):
-                yield Label("Schedule:", classes="section-label")
+            # Schedule controls and countdown side by side (stacks on narrow screens)
+            with Horizontal(id="schedule-row"):
+                # Timer controls
+                with Vertical(id="timer-section"):
+                    yield Label("Schedule:", classes="section-label")
 
-                # Day selector
-                with Horizontal(id="day-selector"):
-                    for i, name in enumerate(["M", "T", "W", "T", "F", "S", "S"]):
-                        btn = DayButton(name, i, classes="day-button")
-                        if i not in self.config.days_of_week:
-                            btn.selected = False
-                            btn.remove_class("selected")
-                        yield btn
+                    # Day selector
+                    with Horizontal(id="day-selector"):
+                        for i, name in enumerate(["M", "T", "W", "T", "F", "S", "S"]):
+                            btn = DayButton(name, i, classes="day-button")
+                            if i not in self.config.days_of_week:
+                                btn.selected = False
+                                btn.remove_class("selected")
+                            yield btn
 
-                # Minute interval selector
-                with Horizontal(id="minute-section"):
-                    yield Label("Interval: ", classes="section-label")
-                    for interval in [1, 5, 15, 60]:
-                        btn = MinuteButton(interval, classes="minute-button")
-                        if interval == self.config.minute_interval.value:
-                            btn.selected = True
-                            btn.add_class("selected")
-                        else:
-                            btn.selected = False
-                            btn.remove_class("selected")
-                        yield btn
+                    # Hour range selector
+                    # Switch LEFT (off) = All Day, Switch RIGHT (on) = Hour Range
+                    with Horizontal(id="hour-section"):
+                        yield Label("Hours: ", classes="section-label")
+                        all_day_label = Label("All day ", id="all-hours-label")
+                        use_hour_range = not self.config.hours.run_every_hour
+                        if use_hour_range:
+                            all_day_label.add_class("dimmed")
+                        yield all_day_label
+                        yield Switch(
+                            value=use_hour_range,
+                            id="hour-range-switch",
+                        )
 
-            # Countdown display
-            with Container(id="countdown-section"):
-                yield Digits("00:00:00", id="countdown-digits")
-                yield Button(
-                    "Start" if self.scheduler.is_paused else "Pause",
-                    id="pause-button",
-                    variant="primary",
-                )
+                        # Hour range selectors (enabled when switch is RIGHT/on)
+                        hour_options = [(f"{h:02d}:00", h) for h in range(24)]
+                        yield Select(
+                            hour_options,
+                            value=self.config.hours.start_hour,
+                            id="start-hour-select",
+                            classes="hour-select",
+                            disabled=not use_hour_range,
+                        )
+                        yield Label(" to ", id="hour-to-label")
+                        yield Select(
+                            hour_options,
+                            value=self.config.hours.end_hour,
+                            id="end-hour-select",
+                            classes="hour-select",
+                            disabled=not use_hour_range,
+                        )
+
+                    # Minute interval selector
+                    with Horizontal(id="minute-section"):
+                        yield Label("Interval: ", classes="section-label")
+                        for interval in [1, 5, 15, 60]:
+                            btn = MinuteButton(interval, classes="minute-button")
+                            if interval == self.config.minute_interval.value:
+                                btn.selected = True
+                                btn.add_class("selected")
+                            else:
+                                btn.selected = False
+                                btn.remove_class("selected")
+                            yield btn
+
+                # Countdown display
+                with Container(id="countdown-section"):
+                    yield RetroCountdown(id="countdown-display")
+                    yield Button(
+                        "Start" if self.scheduler.is_paused else "Pause",
+                        id="pause-button",
+                        variant="primary",
+                    )
 
             # Output section
             with Vertical(id="output-section"):
@@ -281,8 +459,8 @@ class ClaunApp(App):
     def _update_countdown(self) -> None:
         """Update the countdown display."""
         countdown = self.scheduler.get_countdown_formatted()
-        digits = self.query_one("#countdown-digits", Digits)
-        digits.update(countdown)
+        display = self.query_one("#countdown-display", RetroCountdown)
+        display.set_time(countdown)
 
     async def _scheduler_loop(self) -> None:
         """Main scheduler loop."""
@@ -392,6 +570,34 @@ class ClaunApp(App):
         elif button.id == "pause-button":
             self.action_toggle_pause()
 
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        """Handle switch changes."""
+        if event.switch.id == "hour-range-switch":
+            # Switch RIGHT (on/true) = use hour range
+            # Switch LEFT (off/false) = all day
+            use_hour_range = event.value
+
+            start_select = self.query_one("#start-hour-select", Select)
+            end_select = self.query_one("#end-hour-select", Select)
+            all_day_label = self.query_one("#all-hours-label", Label)
+
+            # Enable hour selects when using hour range
+            start_select.disabled = not use_hour_range
+            end_select.disabled = not use_hour_range
+
+            # Dim the "All day" label when using hour range
+            if use_hour_range:
+                all_day_label.add_class("dimmed")
+            else:
+                all_day_label.remove_class("dimmed")
+
+            self._update_schedule()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        """Handle select changes."""
+        if event.select.id in ("start-hour-select", "end-hour-select"):
+            self._update_schedule()
+
     def _update_schedule(self) -> None:
         """Update schedule from UI state."""
         # Get selected days
@@ -399,6 +605,22 @@ class ClaunApp(App):
         for btn in self.query(".day-button"):
             if isinstance(btn, DayButton) and btn.selected:
                 days.add(btn.day_num)
+
+        # Get hour configuration
+        # Switch RIGHT (on) = use hour range, Switch LEFT (off) = all day
+        hour_range_switch = self.query_one("#hour-range-switch", Switch)
+        start_select = self.query_one("#start-hour-select", Select)
+        end_select = self.query_one("#end-hour-select", Select)
+
+        # Handle Select.BLANK value
+        start_hour = start_select.value if start_select.value != Select.BLANK else 0
+        end_hour = end_select.value if end_select.value != Select.BLANK else 23
+
+        hours = HourConfig(
+            run_every_hour=not hour_range_switch.value,  # Inverted: switch ON = use range
+            start_hour=start_hour,
+            end_hour=end_hour,
+        )
 
         # Get selected minute interval
         interval = MinuteInterval.EVERY_15
@@ -409,6 +631,7 @@ class ClaunApp(App):
 
         # Update config and scheduler
         self.config.days_of_week = days
+        self.config.hours = hours
         self.config.minute_interval = interval
         self.scheduler = Scheduler(self.config)
         self.scheduler.get_next_run()
