@@ -384,7 +384,7 @@ class ClaunApp(App):
             with Vertical(id="flags-section"):
                 yield Label("Claude Flags (optional):", classes="section-label")
                 yield Input(
-                    placeholder="e.g., --resume abc123 or --model sonnet",
+                    placeholder="e.g., --resume abc123, --model sonnet, --allowedTools WebSearch",
                     value=self.config.claude_flags,
                     id="flags-input",
                 )
@@ -481,7 +481,7 @@ class ClaunApp(App):
         countdown = self.query_one("#countdown-display", RetroCountdown)
         countdown_section = self.query_one("#countdown-section")
         # Switch to compact text mode when narrow instead of stacking
-        if self.size.width < 100:
+        if self.size.width < 135:
             countdown.set_compact(True)
             countdown_section.add_class("compact")
         else:
