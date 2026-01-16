@@ -3,8 +3,11 @@
 import pytest
 from unittest.mock import patch, AsyncMock
 
+from pathlib import Path
+
 from claun.core.config import ScheduleConfig, HourConfig, MinuteInterval
 from claun.tui.app import ClaunApp, DayButton, MinuteButton, RetroCountdown
+from claun.tui.screens.save_config import SaveConfigModal
 
 
 class TestTUIInitialization:
@@ -210,3 +213,102 @@ class TestTUIResponsiveLayout:
             countdown = app.query_one("#countdown-display", RetroCountdown)
             assert "compact" not in countdown_section.classes
             assert countdown._compact is False
+
+
+class TestSaveConfigModal:
+    """Test save config modal."""
+
+    @pytest.mark.asyncio
+    async def test_save_config_action_opens_modal(self) -> None:
+        """Save config action opens the modal."""
+        app = ClaunApp()
+        async with app.run_test() as pilot:
+            # Trigger save action
+            app.action_save_config()
+            await pilot.pause()
+
+            # Modal should be on the screen stack
+            assert len(app.screen_stack) == 2
+            assert isinstance(app.screen_stack[-1], SaveConfigModal)
+
+    @pytest.mark.asyncio
+    async def test_save_config_modal_has_default_path(self) -> None:
+        """Modal shows default path in input."""
+        config = ScheduleConfig(command="test")
+        modal = SaveConfigModal(config)
+
+        app = ClaunApp()
+        async with app.run_test() as pilot:
+            app.push_screen(modal)
+            await pilot.pause()
+
+            from textual.widgets import Input
+            path_input = app.screen.query_one("#path-input", Input)
+            assert path_input.value == ".claun.json"
+
+    @pytest.mark.asyncio
+    async def test_save_config_modal_saves_file(self, tmp_path: Path) -> None:
+        """Modal saves config to specified file."""
+        config = ScheduleConfig(
+            command="save me",
+            minute_interval=MinuteInterval.EVERY_5,
+        )
+        save_path = tmp_path / "saved.json"
+        modal = SaveConfigModal(config, default_path=str(save_path))
+
+        app = ClaunApp()
+        async with app.run_test() as pilot:
+            app.push_screen(modal)
+            await pilot.pause()
+
+            # Click save button
+            await pilot.click("#save-btn")
+            await pilot.pause()
+
+            # File should exist
+            assert save_path.exists()
+
+            # Load and verify
+            loaded = ScheduleConfig.load_from_file(save_path)
+            assert loaded.command == "save me"
+            assert loaded.minute_interval == MinuteInterval.EVERY_5
+
+    @pytest.mark.asyncio
+    async def test_save_config_modal_cancel_closes(self) -> None:
+        """Cancel button closes modal without saving."""
+        config = ScheduleConfig(command="test")
+        modal = SaveConfigModal(config)
+
+        app = ClaunApp()
+        async with app.run_test() as pilot:
+            app.push_screen(modal)
+            await pilot.pause()
+
+            # Modal should be visible
+            assert len(app.screen_stack) == 2
+
+            # Click cancel
+            await pilot.click("#cancel-btn")
+            await pilot.pause()
+
+            # Modal should be closed
+            assert len(app.screen_stack) == 1
+
+    @pytest.mark.asyncio
+    async def test_save_config_modal_escape_closes(self) -> None:
+        """Escape key closes modal."""
+        config = ScheduleConfig(command="test")
+        modal = SaveConfigModal(config)
+
+        app = ClaunApp()
+        async with app.run_test() as pilot:
+            app.push_screen(modal)
+            await pilot.pause()
+
+            assert len(app.screen_stack) == 2
+
+            # Press escape
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert len(app.screen_stack) == 1

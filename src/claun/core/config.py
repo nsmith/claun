@@ -1,8 +1,10 @@
 """Configuration dataclasses for claun."""
 
+import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
 
 
 class MinuteInterval(Enum):
@@ -102,6 +104,72 @@ class ScheduleConfig:
         for day in self.days_of_week:
             if not 0 <= day <= 6:
                 raise ValueError(f"day_of_week must be 0-6, got {day}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to JSON-serializable dict."""
+        result: dict[str, Any] = {
+            "command": self.command,
+            "claude_flags": self.claude_flags,
+            "days_of_week": sorted(self.days_of_week),
+            "hours": {
+                "run_every_hour": self.hours.run_every_hour,
+                "start_hour": self.hours.start_hour,
+                "end_hour": self.hours.end_hour,
+            },
+            "minute_interval": self.minute_interval.value,
+            "log_path": self.log_path,
+        }
+        if self.log_id:
+            result["log_id"] = self.log_id
+        if self.advanced:
+            result["advanced"] = {
+                "specific_dates": self.advanced.specific_dates,
+                "days_of_month": sorted(self.advanced.days_of_month),
+                "specific_hours": sorted(self.advanced.specific_hours),
+                "custom_minute_interval": self.advanced.custom_minute_interval,
+            }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ScheduleConfig":
+        """Load from dict."""
+        hours_data = data.get("hours", {})
+        hours = HourConfig(
+            run_every_hour=hours_data.get("run_every_hour", True),
+            start_hour=hours_data.get("start_hour", 0),
+            end_hour=hours_data.get("end_hour", 23),
+        )
+
+        advanced = None
+        if "advanced" in data:
+            adv_data = data["advanced"]
+            advanced = AdvancedConfig(
+                specific_dates=adv_data.get("specific_dates", []),
+                days_of_month=set(adv_data.get("days_of_month", [])),
+                specific_hours=set(adv_data.get("specific_hours", [])),
+                custom_minute_interval=adv_data.get("custom_minute_interval"),
+            )
+
+        return cls(
+            command=data.get("command", ""),
+            claude_flags=data.get("claude_flags", ""),
+            days_of_week=set(data.get("days_of_week", ALL_DAYS)),
+            hours=hours,
+            minute_interval=MinuteInterval(data.get("minute_interval", 15)),
+            advanced=advanced,
+            log_path=data.get("log_path", "."),
+            log_id=data.get("log_id"),
+        )
+
+    def save_to_file(self, path: Path) -> None:
+        """Save config to JSON file."""
+        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
+
+    @classmethod
+    def load_from_file(cls, path: Path) -> "ScheduleConfig":
+        """Load config from JSON file."""
+        data = json.loads(path.read_text())
+        return cls.from_dict(data)
 
 
 @dataclass
