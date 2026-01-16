@@ -196,9 +196,9 @@ class TestTUIResponsiveLayout:
 
     @pytest.mark.asyncio
     async def test_compact_countdown_when_narrow(self) -> None:
-        """Countdown switches to compact mode when width is below 100."""
+        """Countdown switches to compact mode when width is below 135."""
         app = ClaunApp()
-        async with app.run_test(size=(80, 40)) as pilot:
+        async with app.run_test(size=(120, 40)) as pilot:
             countdown_section = app.query_one("#countdown-section")
             countdown = app.query_one("#countdown-display", RetroCountdown)
             assert "compact" in countdown_section.classes
@@ -206,7 +206,7 @@ class TestTUIResponsiveLayout:
 
     @pytest.mark.asyncio
     async def test_full_countdown_when_wide(self) -> None:
-        """Countdown uses full ASCII art when width is 100 or more."""
+        """Countdown uses full ASCII art when width is 135 or more."""
         app = ClaunApp()
         async with app.run_test(size=(150, 40)) as pilot:
             countdown_section = app.query_one("#countdown-section")

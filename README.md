@@ -1,6 +1,10 @@
 # claun
 
+![Claun TUI](docs/screenshot.png)
+
 Schedule Claude Code jobs with a TUI or headless mode. Sometimes systemd is just overkill. Pronounced "Klon" like the guitar pedal.
+
+In all seriousness, the purpose of this tool is to quickly prototype workflows, or for something that is going to run on your dev desktop (like pulling/fixing bugs and submitting PRs). Please don't use it for a production pipeline! If you want to do something that you rely on for real work use systemd or Kinesis/Glue/Lambda (or I guess cron if you are old school like that). I am not responsible for any 3am pages when this falls over ;) 
 
 ## Installation
 
@@ -26,7 +30,7 @@ claun --dry-run -c "test command"
 
 ## Features
 
-- **Beautiful TUI**: Single-page interface with all controls visible - no menu diving
+- **Simple TUI**: Single-page interface with all controls visible - no menu diving
 - **Headless mode**: Run as a background service with terminal output
 - **Flexible scheduling**: Days of week, hour ranges, minute intervals
 - **Claude flags**: Pass any flags to claude (like `--resume` for session persistence)
