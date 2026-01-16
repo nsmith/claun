@@ -4,7 +4,7 @@
 
 Schedule Claude Code jobs with a TUI or headless mode. Sometimes systemd is just overkill. Pronounced "Klon" like the guitar pedal.
 
-In all seriousness, the purpose of this tool is to quickly prototype workflows, or for something that is going to run on your dev desktop (like pulling/fixing bugs and submitting PRs). Please don't use it for a production pipeline! If you want to do something that you rely on for real work use systemd or Kinesis/Glue/Lambda (or I guess cron if you are old school like that). I am not responsible for any 3am pages when this falls over ;) 
+In all seriousness, the purpose of this tool is to quickly prototype workflows, or for something that is going to run on your dev desktop (like pulling/fixing bugs and submitting PRs). Please don't use it for a production pipeline! If you want to build something that you can rely on, please use systemd or Kinesis/Glue/Lambda (or I guess cron if you are old school like that). I am not responsible for any 3am pages when this falls over ;) 
 
 ## Installation
 
